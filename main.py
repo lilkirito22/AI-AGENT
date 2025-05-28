@@ -7,16 +7,17 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 
 load_dotenv()
 
+
 class ResearchResponse(BaseModel):
-  topic: str
-  summary: str
-  sources: list[str]
-  tools_used: list[str]
-  
+    topic: str
+    summary: str
+    sources: list[str]
+    tools_used: list[str]
+
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
-parser = PydanticOutputParser(pydantic_object= ResearchResponse)
+parser = PydanticOutputParser(pydantic_object=ResearchResponse)
 
 prompt = ChatPromptTemplate.from_messages(
     [
@@ -34,17 +35,14 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(format_instructions=parser.get_format_instructions())
 
-agent = create_tool_calling_agent(
-  llm=llm,
-  prompt=prompt,
-  tools=[]
+agent = create_tool_calling_agent(llm=llm, prompt=prompt, tools=[])
+
+agent_executor = AgentExecutor(agent=agent, tools=[], verbose=True)
+raw_response = agent_executor.invoke(
+    {"query": "What is the impact of climate change on polar bear populations?"}
 )
 
-agent_executor = AgentExecutor(agent=agent,
-                               tools=[],
-                               verbose=True)
-raw_response = agent_executor.invoke({
-    "query": "What is the impact of climate change on polar bear populations?"
-})
-
 print(raw_response)
+
+structured_response = parser.parse(raw_response.get("output", ""))
+print(structured_response)
