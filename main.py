@@ -15,6 +15,8 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 
 from docx import Document
 from PyPDF2 import PdfReader
+import openpyxl
+import csv
 
 
 # Carregar variáveis de ambiente do arquivo .env
@@ -38,62 +40,133 @@ prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """Você é um assistente de organização de arquivos extremamente inteligente e autônomo.
-     Sua tarefa é analisar o conteúdo de um arquivo e identificar a CATEGORIA MAIS ESPECÍFICA E RELEVANTE para ele.
+     Sua tarefa é analisar o conteúdo ou a descrição de um arquivo e identificar a CATEGORIA MAIS ESPECÍFICA E RELEVANTE para ele.
      A categoria deve ser concisa (1-3 palavras, no máximo) e refletir o tema principal ou propósito do arquivo.
      Pense em como um humano organizaria esses arquivos em pastas lógicas.
-     Exemplos de categorias esperadas: "Relatórios Financeiros", "Contratos Legais", "Receitas Culinárias", "Fotos de Viagem", "Material de Estudo", "Projetos Pessoais", "Documentos de Identidade", "Faturas de Contas", "Música Favorita", "Downloads Aleatórios".
+     Exemplos de categorias esperadas: "Relatórios Financeiros", "Contratos Legais", "Receitas Culinárias", "Fotos de Viagem", "Material de Estudo", "Projetos Pessoais", "Documentos de Identidade", "Faturas de Contas", "Música Favorita", "Downloads Aleatórios", "Códigos Fonte", "Scripts", "Planilhas de Dados", "Configurações", "Arquivos de Sistema".
      Não inclua aspas, pontuação extra, ou qualquer outra explicação na sua resposta, apenas a categoria.
      Se o conteúdo for ambíguo, genérico ou insuficiente, use uma categoria ampla como "Vários" ou "Geral".""",
         ),
-        ("user", "Conteúdo do arquivo:\n---\n{file_content}\n-----"),
+        ("user", "Conteúdo/Descrição do arquivo:\n---\n{file_content}\n---"),
     ]
 )
 
 # Cria uma "chain" simples: prompt -> modelo -> parser de saída
 # O StrOutputParser apenas garante que a saída seja uma string limpa.
-
-categorization_chain = prompt | llm | StrOutputParser()
+if llm:
+    categorization_chain = prompt | llm | StrOutputParser()
+else:
+    categorization_chain = None
 
 
 # Função para extrair texto de arquivos
 def extrair_texto_do_arquivo(caminho_arquivo):
     _, extensao = os.path.splitext(caminho_arquivo)
     extensao = extensao.lower()
+    nome_arquivo = os.path.basename(caminho_arquivo)
 
-    # Tratamento para arquivos de imagem comuns (apenas nome/extensão para este exemplo)
-    if extensao in (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"):
-        return f"Arquivo de imagem: {os.path.basename(caminho_arquivo)}"  # Gemini pode inferir de "Arquivo de imagem"
-    elif extensao in (".mp3", ".wav", ".ogg", ".flac"):
-        return f"Arquivo de áudio: {os.path.basename(caminho_arquivo)}"
-    elif extensao in (".mp4", ".avi", ".mov", ".mkv"):
-        return f"Arquivo de vídeo: {os.path.basename(caminho_arquivo)}"
+    # Tipos que podem ser lidos como texto puro
+    text_extensions = (
+        '.txt', '.log', '.md', '.json', '.xml', '.yaml', '.yml', '.ini', '.cfg',
+        '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.js', '.ts', '.html', '.css', '.scss',
+        '.sh', '.bat', '.ps1', '.php', '.go', '.rb', '.swift', '.kt', '.r', '.sql',
+        '.asm', '.circ' # Adicionado .asm e .circ
+    )
 
-    if extensao == ".txt":
+    if extensao in text_extensions:
         try:
-            with open(caminho_arquivo, "r", encoding="utf-8") as f:
-                return f.read()
+            with open(caminho_arquivo, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Limita o tamanho para não sobrecarregar o Gemini com arquivos muito grandes
+                return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
+        except UnicodeDecodeError:
+            try:
+                with open(caminho_arquivo, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                    return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
+            except Exception as e:
+                print(f"Erro ao ler arquivo de texto '{nome_arquivo}': {e}")
+                return f"Arquivo de texto ilegível: {nome_arquivo}"
         except Exception as e:
-            print(f"Erro ao ler TXT {caminho_arquivo}: {e}")
-            return None
-    elif extensao == ".docx":
+            print(f"Erro ao ler arquivo de texto '{nome_arquivo}': {e}")
+            return f"Arquivo de texto com erro: {nome_arquivo}"
+
+    # Tipos de documentos
+    elif extensao == '.docx':
         try:
             document = Document(caminho_arquivo)
-            return "\n".join([para.text for para in document.paragraphs])
+            content = "\n".join([para.text for para in document.paragraphs])
+            return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
         except Exception as e:
-            print(f"Erro ao ler DOCX {caminho_arquivo}: {e}")
-            return None
-    elif extensao == ".pdf":
+            print(f"Erro ao ler DOCX '{nome_arquivo}': {e}")
+            return f"Documento Word com erro: {nome_arquivo}"
+    elif extensao == '.pdf':
         try:
             reader = PdfReader(caminho_arquivo)
             texto = ""
             for page in reader.pages:
                 texto += page.extract_text() or ""
-            return texto
+            return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {texto[:5000]}"
         except Exception as e:
-            print(f"Erro ao ler PDF {caminho_arquivo}: {e}")
-            return None
-    return None
+            print(f"Erro ao ler PDF '{nome_arquivo}': {e}")
+            return f"Documento PDF com erro: {nome_arquivo}"
 
+    # Arquivos de Planilha
+    elif extensao == '.xlsx':
+        try:
+            workbook = openpyxl.load_workbook(caminho_arquivo)
+            sheet_names = ", ".join(workbook.sheetnames)
+            # Tenta pegar algumas células da primeira aba para dar contexto
+            first_sheet = workbook.active
+            sample_data = []
+            for row_idx in range(1, min(first_sheet.max_row + 1, 6)): # Pega até 5 linhas
+                row_values = []
+                for col_idx in range(1, min(first_sheet.max_column + 1, 6)): # Pega até 5 colunas
+                    cell_value = first_sheet.cell(row=row_idx, column=col_idx).value
+                    if cell_value is not None:
+                        row_values.append(str(cell_value))
+                if row_values:
+                    sample_data.append(", ".join(row_values))
+            
+            return (f"Nome do arquivo: {nome_arquivo}\n"
+                    f"Tipo: Planilha Excel\n"
+                    f"Nomes das abas: {sheet_names}\n"
+                    f"Dados de exemplo (primeiras linhas/colunas): {'; '.join(sample_data)[:1000]}") # Limita para IA
+        except Exception as e:
+            print(f"Erro ao ler XLSX '{nome_arquivo}': {e}")
+            return f"Planilha Excel com erro: {nome_arquivo}"
+    elif extensao == '.csv':
+        try:
+            with open(caminho_arquivo, 'r', encoding='utf-8') as f:
+                # Lê as primeiras 10 linhas para dar um contexto
+                reader = csv.reader(f)
+                sample_lines = []
+                for i, row in enumerate(reader):
+                    if i >= 10: break
+                    sample_lines.append(",".join(row))
+            return (f"Nome do arquivo: {nome_arquivo}\n"
+                    f"Tipo: Arquivo CSV\n"
+                    f"Dados de exemplo (primeiras 10 linhas): {'\\n'.join(sample_lines)[:5000]}")
+        except Exception as e:
+            print(f"Erro ao ler CSV '{nome_arquivo}': {e}")
+            return f"Arquivo CSV com erro: {nome_arquivo}"
+
+    # Tipos multimídia (apenas nome/extensão para IA, a menos que você adicione multimodalidade real)
+    elif extensao in ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'):
+        return f"Arquivo de imagem: {nome_arquivo}"
+    elif extensao in ('.mp3', '.wav', '.ogg', '.flac', '.aac'):
+         return f"Arquivo de áudio: {nome_arquivo}"
+    elif extensao in ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'):
+         return f"Arquivo de vídeo: {nome_arquivo}"
+    
+    # Outros tipos de arquivo que o Gemini pode categorizar pelo nome ou extensão
+    elif extensao in ('.zip', '.rar', '.7z', '.tar', '.gz', '.iso'):
+        return f"Arquivo compactado ou imagem de disco: {nome_arquivo}"
+    elif extensao in ('.exe', '.dll', '.msi'):
+        return f"Arquivo executável ou de sistema: {nome_arquivo}"
+
+    # Tipo de arquivo não suportado para extração de conteúdo detalhado
+    return f"Arquivo não processável por conteúdo: {nome_arquivo}. Extensão: {extensao}"
 
 # --- Função para categorizar arquivo usando Gemini via LangChain ---
 
@@ -127,9 +200,13 @@ def categorizar_arquivo_com_gemini_lc(caminho_arquivo):
 
 
 # --- Função principal para organizar ---
-def organizar_pasta_com_ia_lc(caminho_pasta_baguncada, log_func, progress_var, total_files_var):
+def organizar_pasta_com_ia_lc(
+    caminho_pasta_baguncada, log_func, progress_var, total_files_var
+):
     if not os.path.isdir(caminho_pasta_baguncada):
-        log_func(f"Erro: O caminho '{caminho_pasta_baguncada}' não é um diretório válido.\n")
+        log_func(
+            f"Erro: O caminho '{caminho_pasta_baguncada}' não é um diretório válido.\n"
+        )
         return
 
     log_func(f"Iniciando organização da pasta: {caminho_pasta_baguncada}\n")
@@ -139,46 +216,57 @@ def organizar_pasta_com_ia_lc(caminho_pasta_baguncada, log_func, progress_var, t
         for item in os.listdir(caminho_pasta_baguncada)
         if os.path.isfile(os.path.join(caminho_pasta_baguncada, item))
     ]
-    
+
     total_files = len(arquivos_a_processar)
-    total_files_var.set(total_files) # Atualiza o total de arquivos na GUI
+    total_files_var.set(total_files)  # Atualiza o total de arquivos na GUI
     processed_count = 0
 
     for caminho_completo_arquivo in arquivos_a_processar:
         nome_arquivo = os.path.basename(caminho_completo_arquivo)
         log_func(f"\nProcessando: {nome_arquivo}\n")
-        
+
         categoria_sugerida = categorizar_arquivo_com_gemini_lc(caminho_completo_arquivo)
-        
+
         if categoria_sugerida:
             pasta_destino = os.path.join(caminho_pasta_baguncada, categoria_sugerida)
-            
+
             if not os.path.exists(pasta_destino):
                 try:
                     os.makedirs(pasta_destino)
                     log_func(f"Pasta criada: {pasta_destino}\n")
                 except Exception as e:
-                    log_func(f"Erro ao criar pasta {pasta_destino}: {e}. Usando 'Outros_Arquivos'.\n")
-                    pasta_destino = os.path.join(caminho_pasta_baguncada, "Outros_Arquivos")
+                    log_func(
+                        f"Erro ao criar pasta {pasta_destino}: {e}. Usando 'Outros_Arquivos'.\n"
+                    )
+                    pasta_destino = os.path.join(
+                        caminho_pasta_baguncada, "Outros_Arquivos"
+                    )
                     if not os.path.exists(pasta_destino):
-                         os.makedirs(pasta_destino)
+                        os.makedirs(pasta_destino)
 
             try:
-                shutil.move(caminho_completo_arquivo, os.path.join(pasta_destino, nome_arquivo))
+                shutil.move(
+                    caminho_completo_arquivo, os.path.join(pasta_destino, nome_arquivo)
+                )
                 log_func(f"Movido: '{nome_arquivo}' para '{pasta_destino}'\n")
             except shutil.Error as e:
-                log_func(f"Erro ao mover '{nome_arquivo}': {e}. Pode ser que já exista um arquivo com esse nome no destino.\n")
+                log_func(
+                    f"Erro ao mover '{nome_arquivo}': {e}. Pode ser que já exista um arquivo com esse nome no destino.\n"
+                )
             except Exception as e:
                 log_func(f"Erro inesperado ao mover '{nome_arquivo}': {e}\n")
         else:
-            log_func(f"Arquivo '{nome_arquivo}' não foi categorizado. Deixando na pasta original.\n")
-        
+            log_func(
+                f"Arquivo '{nome_arquivo}' não foi categorizado. Deixando na pasta original.\n"
+            )
+
         processed_count += 1
-        progress_var.set(processed_count) # Atualiza a barra de progresso
-    
+        progress_var.set(processed_count)  # Atualiza a barra de progresso
+
     log_func("\nOrganização concluída!\n")
     # A messagebox deve ser chamada na thread principal da GUI, não na thread de background
     # Então, vamos fazer isso fora desta função, no método _run_organizing
+
 
 # --- Classe da Interface Gráfica ---
 class FileOrganizerApp:
@@ -290,14 +378,17 @@ class FileOrganizerApp:
     def _run_organizing(self, folder):
         try:
             # Passe o método de log da classe, e as variáveis de progresso diretamente
-            organizar_pasta_com_ia_lc(folder, self.log_message, self.progress_var, self.total_files_var)
-            messagebox.showinfo("Concluído", "A organização dos arquivos foi finalizada!") # Mova para aqui
+            organizar_pasta_com_ia_lc(
+                folder, self.log_message, self.progress_var, self.total_files_var
+            )
+            messagebox.showinfo(
+                "Concluído", "A organização dos arquivos foi finalizada!"
+            )  # Mova para aqui
         except Exception as e:
             self.log_message(f"Erro inesperado durante a organização: {e}\n")
             messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
         finally:
-            self.organize_button.config(state=tk.NORMAL) # Reabilita o botão
-    
+            self.organize_button.config(state=tk.NORMAL)  # Reabilita o botão
 
 
 # --- Exemplo de Uso ---

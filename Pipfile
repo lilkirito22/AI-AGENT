@@ -14,6 +14,7 @@ pydantic = "*"
 python-docx = "*"
 pypdf2 = "*"
 pillow = "*"
+openpyxl = "*"
 
 [dev-packages]
 
