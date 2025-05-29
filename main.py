@@ -184,8 +184,8 @@ def extrair_texto_do_arquivo(caminho_arquivo):
                         break
                     sample_lines.append(",".join(row))
 
-            # --- CORREÇÃO DA LINHA ABAIXO ---
-            newline_delimiter = "\n"  # Defina a string de nova linha em uma variável
+            
+            newline_delimiter = "\n"
             return (
                 f"Nome do arquivo: {nome_arquivo}\n"
                 f"Tipo: Arquivo CSV\n"
@@ -195,7 +195,7 @@ def extrair_texto_do_arquivo(caminho_arquivo):
             print(f"Erro ao ler CSV '{nome_arquivo}': {e}")
             return f"Arquivo CSV com erro: {nome_arquivo}"
 
-    # Tipos multimídia (apenas nome/extensão para IA, a menos que você adicione multimodalidade real)
+    # Tipos multimídia
     elif extensao in (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"):
         return f"Arquivo de imagem: {nome_arquivo}"
     elif extensao in (".mp3", ".wav", ".ogg", ".flac", ".aac"):
