@@ -20,6 +20,12 @@ import csv
 
 
 # Carregar variáveis de ambiente do arquivo .env
+"""
+LEMBRESE de criar um arquivo .env na raiz do projeto com a variável GEMINI_API_KEY ou da IA que vc preferir  definida
+tambem lembre-se de nao compartilhar esse arquivo .env com ninguém, pois ele contém informações sensíveis.
+e caso va publicar no github, adicione o .env no seu .gitignore
+
+"""
 load_dotenv()
 
 
@@ -184,7 +190,6 @@ def extrair_texto_do_arquivo(caminho_arquivo):
                         break
                     sample_lines.append(",".join(row))
 
-            
             newline_delimiter = "\n"
             return (
                 f"Nome do arquivo: {nome_arquivo}\n"
