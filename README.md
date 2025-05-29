@@ -13,7 +13,7 @@ Um organizador de arquivos inteligente desenvolvido em Python, utilizando o pode
 
 Aqui está uma prévia da interface do programa em funcionamento:
 
-![Captura de tela da interface do AI File Organizer](assets/gui_screenshot.png)
+![Captura de tela da interface do AI File Organizer](./assets/gui_screenshot.png.png)
 
 ## 🚀 Como Fazer Funcionar
 
