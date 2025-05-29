@@ -11,6 +11,9 @@ langchain-google-genai = "*"
 langchain-anthropic = "*"
 python-dotenv = "*"
 pydantic = "*"
+python-docx = "*"
+pypdf2 = "*"
+pillow = "*"
 
 [dev-packages]
 
