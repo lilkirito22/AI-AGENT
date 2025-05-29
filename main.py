@@ -67,21 +67,50 @@ def extrair_texto_do_arquivo(caminho_arquivo):
 
     # Tipos que podem ser lidos como texto puro
     text_extensions = (
-        '.txt', '.log', '.md', '.json', '.xml', '.yaml', '.yml', '.ini', '.cfg',
-        '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.js', '.ts', '.html', '.css', '.scss',
-        '.sh', '.bat', '.ps1', '.php', '.go', '.rb', '.swift', '.kt', '.r', '.sql',
-        '.asm', '.circ' # Adicionado .asm e .circ
+        ".txt",
+        ".log",
+        ".md",
+        ".json",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".ini",
+        ".cfg",
+        ".py",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".cs",
+        ".js",
+        ".ts",
+        ".html",
+        ".css",
+        ".scss",
+        ".sh",
+        ".bat",
+        ".ps1",
+        ".php",
+        ".go",
+        ".rb",
+        ".swift",
+        ".kt",
+        ".r",
+        ".sql",
+        ".asm",
+        ".circ",  # Adicionado .asm e .circ
     )
 
     if extensao in text_extensions:
         try:
-            with open(caminho_arquivo, 'r', encoding='utf-8') as f:
+            with open(caminho_arquivo, "r", encoding="utf-8") as f:
                 content = f.read()
                 # Limita o tamanho para não sobrecarregar o Gemini com arquivos muito grandes
                 return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
         except UnicodeDecodeError:
             try:
-                with open(caminho_arquivo, 'r', encoding='latin-1') as f:
+                with open(caminho_arquivo, "r", encoding="latin-1") as f:
                     content = f.read()
                     return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
             except Exception as e:
@@ -92,81 +121,97 @@ def extrair_texto_do_arquivo(caminho_arquivo):
             return f"Arquivo de texto com erro: {nome_arquivo}"
 
     # Tipos de documentos
-    elif extensao == '.docx':
+    elif extensao == ".docx":
         try:
             document = Document(caminho_arquivo)
             content = "\n".join([para.text for para in document.paragraphs])
-            return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
+            return (
+                f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {content[:5000]}"
+            )
         except Exception as e:
             print(f"Erro ao ler DOCX '{nome_arquivo}': {e}")
             return f"Documento Word com erro: {nome_arquivo}"
-    elif extensao == '.pdf':
+    elif extensao == ".pdf":
         try:
             reader = PdfReader(caminho_arquivo)
             texto = ""
             for page in reader.pages:
                 texto += page.extract_text() or ""
-            return f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {texto[:5000]}"
+            return (
+                f"Nome do arquivo: {nome_arquivo}\nConteúdo (parcial): {texto[:5000]}"
+            )
         except Exception as e:
             print(f"Erro ao ler PDF '{nome_arquivo}': {e}")
             return f"Documento PDF com erro: {nome_arquivo}"
 
     # Arquivos de Planilha
-    elif extensao == '.xlsx':
+    elif extensao == ".xlsx":
         try:
             workbook = openpyxl.load_workbook(caminho_arquivo)
             sheet_names = ", ".join(workbook.sheetnames)
             # Tenta pegar algumas células da primeira aba para dar contexto
             first_sheet = workbook.active
             sample_data = []
-            for row_idx in range(1, min(first_sheet.max_row + 1, 6)): # Pega até 5 linhas
+            for row_idx in range(
+                1, min(first_sheet.max_row + 1, 6)
+            ):  # Pega até 5 linhas
                 row_values = []
-                for col_idx in range(1, min(first_sheet.max_column + 1, 6)): # Pega até 5 colunas
+                for col_idx in range(
+                    1, min(first_sheet.max_column + 1, 6)
+                ):  # Pega até 5 colunas
                     cell_value = first_sheet.cell(row=row_idx, column=col_idx).value
                     if cell_value is not None:
                         row_values.append(str(cell_value))
                 if row_values:
                     sample_data.append(", ".join(row_values))
-            
-            return (f"Nome do arquivo: {nome_arquivo}\n"
-                    f"Tipo: Planilha Excel\n"
-                    f"Nomes das abas: {sheet_names}\n"
-                    f"Dados de exemplo (primeiras linhas/colunas): {'; '.join(sample_data)[:1000]}") # Limita para IA
+
+            return (
+                f"Nome do arquivo: {nome_arquivo}\n"
+                f"Tipo: Planilha Excel\n"
+                f"Nomes das abas: {sheet_names}\n"
+                f"Dados de exemplo (primeiras linhas/colunas): {'; '.join(sample_data)[:1000]}"
+            )  # Limita para IA
         except Exception as e:
             print(f"Erro ao ler XLSX '{nome_arquivo}': {e}")
             return f"Planilha Excel com erro: {nome_arquivo}"
-    elif extensao == '.csv':
+    elif extensao == ".csv":
         try:
-            with open(caminho_arquivo, 'r', encoding='utf-8') as f:
-                # Lê as primeiras 10 linhas para dar um contexto
+            with open(caminho_arquivo, "r", encoding="utf-8") as f:
                 reader = csv.reader(f)
                 sample_lines = []
                 for i, row in enumerate(reader):
-                    if i >= 10: break
+                    if i >= 10:
+                        break
                     sample_lines.append(",".join(row))
-            return (f"Nome do arquivo: {nome_arquivo}\n"
-                    f"Tipo: Arquivo CSV\n"
-                    f"Dados de exemplo (primeiras 10 linhas): {'\\n'.join(sample_lines)[:5000]}")
+
+            # --- CORREÇÃO DA LINHA ABAIXO ---
+            newline_delimiter = "\n"  # Defina a string de nova linha em uma variável
+            return (
+                f"Nome do arquivo: {nome_arquivo}\n"
+                f"Tipo: Arquivo CSV\n"
+                f"Dados de exemplo (primeiras 10 linhas): {newline_delimiter.join(sample_lines)[:5000]}"
+            )
         except Exception as e:
             print(f"Erro ao ler CSV '{nome_arquivo}': {e}")
             return f"Arquivo CSV com erro: {nome_arquivo}"
 
     # Tipos multimídia (apenas nome/extensão para IA, a menos que você adicione multimodalidade real)
-    elif extensao in ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'):
+    elif extensao in (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"):
         return f"Arquivo de imagem: {nome_arquivo}"
-    elif extensao in ('.mp3', '.wav', '.ogg', '.flac', '.aac'):
-         return f"Arquivo de áudio: {nome_arquivo}"
-    elif extensao in ('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'):
-         return f"Arquivo de vídeo: {nome_arquivo}"
-    
+    elif extensao in (".mp3", ".wav", ".ogg", ".flac", ".aac"):
+        return f"Arquivo de áudio: {nome_arquivo}"
+    elif extensao in (".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv"):
+        return f"Arquivo de vídeo: {nome_arquivo}"
+
     # Outros tipos de arquivo que o Gemini pode categorizar pelo nome ou extensão
-    elif extensao in ('.zip', '.rar', '.7z', '.tar', '.gz', '.iso'):
+    elif extensao in (".zip", ".rar", ".7z", ".tar", ".gz", ".iso"):
         return f"Arquivo compactado ou imagem de disco: {nome_arquivo}"
-    elif extensao in ('.exe', '.dll', '.msi'):
+    elif extensao in (".exe", ".dll", ".msi"):
         return f"Arquivo executável ou de sistema: {nome_arquivo}"
 
     # Tipo de arquivo não suportado para extração de conteúdo detalhado
     return f"Arquivo não processável por conteúdo: {nome_arquivo}. Extensão: {extensao}"
+
 
 # --- Função para categorizar arquivo usando Gemini via LangChain ---
 
