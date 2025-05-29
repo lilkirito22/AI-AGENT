@@ -9,6 +9,12 @@ Um organizador de arquivos inteligente desenvolvido em Python, utilizando o pode
 - **Interface Gráfica (GUI):** Fácil de usar, permitindo selecionar a pasta a ser organizada e acompanhar o progresso em tempo real.
 - **Automatização:** Reduz a necessidade de organizar arquivos manualmente, ideal para pastas de downloads ou documentos bagunçados.
 
+### Visualização
+
+Aqui está uma prévia da interface do programa em funcionamento:
+
+![Captura de tela da interface do AI File Organizer](assets/gui_screenshot.png)
+
 ## 🚀 Como Fazer Funcionar
 
 Siga os passos abaixo para configurar e executar o AI File Organizer em sua máquina.
